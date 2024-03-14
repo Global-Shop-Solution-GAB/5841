@@ -1,0 +1,951 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Grid..Create
+Gui.F_Grid..Caption("Router Lines Inspection Control")
+Gui.F_Grid..Size(13200,6570)
+Gui.F_Grid..MinX(0)
+Gui.F_Grid..MinY(0)
+Gui.F_Grid..Position(0,0)
+Gui.F_Grid..BackColor(-2147483633)
+Gui.F_Grid..MousePointer(0)
+Gui.F_Grid..ContextMenuCreate("ctxRowMgmnt")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","ADD",0,"Add Inspection Sequence")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","REMOVE",0,"Remove Selected Sequence")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","INSERT",0,"Insert Blank Sequence")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","UP",0,"Move Line Up")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","DOWN",0,"Move Line Down")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","COPY",0,"Copy Selected Sequences")
+Gui.F_Grid..ContextMenuAddItem("ctxRowMgmnt","PASTE",0,"Paste Sequences")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","ADD","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","REMOVE","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","INSERT","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","UP","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","DOWN","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","COPY","RowManagement")
+Gui.F_Grid..ContextMenuSetItemEventHandler("ctxRowMgmnt","PASTE","RowManagement")
+Gui.F_Grid..Event(UnLoad,Unload)
+Gui.F_Grid.lblRT.Create(Label,"Router No:",True,1935,255,0,240,165,True,0,"Arial",8,-2147483633,0)
+Gui.F_Grid.lblSeq.Create(Label,"Sequence:",True,1935,255,0,3045,165,True,0,"Arial",8,-2147483633,0)
+Gui.F_Grid.GsGcSeqs.Create(GsGridControl)
+Gui.F_Grid.GsGcSeqs.Size(12615,3795)
+Gui.F_Grid.GsGcSeqs.Position(195,1605)
+Gui.F_Grid.GsGcSeqs.ContextMenuAttach("ctxRowMgmnt")
+Gui.F_Grid.GsGcSeqs.Anchor(14)
+Gui.F_Grid.GsGcSeqs.Event(RowCellClick,BrowserButtons)
+Gui.F_Grid.cmdSave.Create(Button)
+Gui.F_Grid.cmdSave.Size(1140,375)
+Gui.F_Grid.cmdSave.Position(11640,5550)
+Gui.F_Grid.cmdSave.Caption("Save")
+Gui.F_Grid.cmdSave.Event(Click,SaveInspectionInformation)
+Gui.F_Grid.cmdSave.Anchor(10)
+Gui.F_Grid.lblInst.Create(Label,"Instructions",True,1035,255,0,285,660,True,0,"Arial",8,-2147483633,0)
+Gui.F_Grid.txtInst.Create(TextboxM)
+Gui.F_Grid.txtInst.Size(6885,915)
+Gui.F_Grid.txtInst.Position(1335,555)
+Gui.F_Grid.txtInst.Anchor(7)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sWO.Declare(String, "")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'This program was created for Pacific Sintered Metals. It is the first portion of a 'Inspection Control Plan' that they want to implement.
+'This script opens from Estimating/Routers>File>Open/New - Lines - Script 1 button. It saves inspection information per Router/Sequence. The form will display a grid in which the user will be able to add or remove lines to the Router Seq.
+'The columns on the grid are INSPECTION, METHOD, FREQUENCY, NON_CONFORM. These will be saved to a custom table, to be accessible for their future process since they want it printed on reports
+
+'Developed by FEQ on 1/20/2020
+
+'Modifications added by FEQ on 09/30/2020
+'We are adding some functionality to the grid. They want to be able to move lines up, or down, add blank lines, and copy/paste info from one router line to another. 
+'To apply the copy paste functionality, we are going to be using a custom pervasive table that will store information per user..
+
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sWO.Declare(String, "")
+
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+	
+	F.Intrinsic.Control.Case(11210)
+		'We want to rename the label of the Script 1 button
+		F.Intrinsic.Control.CallSub(Populate)
+		
+	F.Intrinsic.Control.Case(11410)
+		'First thing to do is to lock the button and load the screen. This will be running off the 
+		F.Intrinsic.Control.CallSub(Initialization)
+		Gui.F_Grid..Show
+		
+	F.Intrinsic.Control.Case(11292)
+		'This is the sequence renumbering hook. If the user renumbers a sequence, we want to go into the script and override the sequence number on the appropriate entries.
+		F.Intrinsic.Control.CallSub(SequenceRenumbering)
+	
+	F.Intrinsic.Control.Case(16770)
+		'This is the WO- Sequence screen population hook. Since some of the dig down sequence do not carry the wo over, we are going to set up teh WO to be on the Global passed variable
+		F.Intrinsic.String.Build("{0}-{1}", V.Passed.009000, V.Passed.009001, V.Local.sWO)
+		V.Passed.GLOBAL.Set(V.Local.sWO)
+	
+	F.Intrinsic.Control.Case(16761)
+		'We want to rename the label of the Script 1 button. WO Material seq
+		V.Passed.000041.Set("INSPECTION")
+		
+	F.Intrinsic.Control.Case(16768)
+		'This is for the work order module. First we check to see if there are entries associated with that work order in the WO insp table (Material)
+		F.Intrinsic.Control.CallSub(WOCheck)
+		F.Intrinsic.Control.CallSub(WOInitialization)
+		Gui.F_Grid..Show
+		
+	F.Intrinsic.Control.Case(16779)
+		'We want to rename the label of the Script 1 button. WO Material seq
+		V.Passed.000038.Set("INSPECTION")
+		
+	F.Intrinsic.Control.Case(16773)
+		'This is for the work order module. First we check to see if there are entries associated with that work order in the WO insp table
+		F.Intrinsic.Control.CallSub(WOCheck)
+		F.Intrinsic.Control.CallSub(WOInitialization)
+		Gui.F_Grid..Show
+		
+	F.Intrinsic.Control.Case(47400)
+		'We want to rename the label of the Script 1 button. WO Material seq
+		V.Passed.000039.Set("INSPECTION")
+		
+	F.Intrinsic.Control.Case(47401)
+		'This is for the work order module. First we check to see if there are entries associated with that work order in the WO insp table
+		F.Intrinsic.Control.CallSub(WOCheck)
+		F.Intrinsic.Control.CallSub(WOInitialization)
+		Gui.F_Grid..Show
+		
+	F.Intrinsic.Control.CaseElse
+		
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Unload.End
+
+Program.Sub.Populate.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+'We are going to change the name of the Script 1 button
+V.Passed.000201.Set("Insp. Control")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.Populate.End
+
+Program.Sub.Initialization.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sRoutr.Declare(String, "")
+V.Local.sRtLin.Declare(String, "")
+V.Local.sQuery.Declare(String, "")
+
+'We populate the screen with existing information from the database
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+V.Local.sRoutr.Set(V.Passed.008000)
+F.Intrinsic.String.LPad(V.Passed.000111, "0", 6, V.Local.sRtLin)
+F.Intrinsic.String.Build("Select ROUTER, LINE_ROUTER, LINE_SEQUENCE, INSTRUCTIONS, INSPECTION, METHOD, FREQUENCY, NON_CONFORM from GCG_5841_RT_INSP where ROUTER = '{0}' and LINE_ROUTER = '{1}' order by LINE_SEQUENCE ASC", V.Local.sRoutr, V.Local.sRtLin, V.Local.sQuery)
+F.Data.DataTable.CreateFromSQL("dtInspInfo", "conx", V.Local.sQuery, True)
+
+F.ODBC.Connection!conx.Close
+
+'We want to make sure that the INSTRUCTIONS are only saved on the Line_sequence 0, and the actual grid information starts from value 1.
+F.Intrinsic.Control.If(V.DataTable.dtInspInfo.RowCount, =, 0)
+	F.Data.DataTable.AddRow("dtInspInfo", "ROUTER", V.Local.sRoutr, "LINE_ROUTER", V.Local.sRtLin, "LINE_SEQUENCE", 0)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Router: {0}", V.Local.sRoutr, V.Local.sRoutr)
+Gui.F_Grid.lblRT.Text(V.Local.sRoutr)
+
+F.Intrinsic.String.Build("Sequence: {0}", V.Local.sRtLin, V.Local.sRtLin)
+Gui.F_Grid.lblSeq.Text(V.Local.sRtLin)
+
+Gui.F_Grid.txtInst.Text(V.DataTable.dtInspInfo(0).INSTRUCTIONS!FieldVal)
+
+F.Intrinsic.Control.CallSub(GridProperties)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.Initialization.End
+
+Program.Sub.GridProperties.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+F.Data.DataTable.AddColumn("dtInspInfo", "INSPECTION_BRW", "String")
+F.Data.DataTable.AddColumn("dtInspInfo", "METHOD_BRW", "String")
+F.Data.DataTable.AddColumn("dtInspInfo", "FREQUENCY_BRW", "String")
+F.Data.DataTable.AddColumn("dtInspInfo", "NON_CONFORM_BRW", "String")
+
+F.Data.DataView.Create("dtInspInfo", "dvInspGrid", 22, "[LINE_SEQUENCE] > 0", "LINE_SEQUENCE ASC")
+
+Gui.F_Grid.GsGcSeqs.AddGridviewFromDataview("gridInspInfo", "dtInspInfo", "dvInspGrid")
+
+F.Intrinsic.Control.If(V.Global.sWO, =, "")
+	
+	Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "ROUTER", "Visible", False)
+	Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "LINE_ROUTER", "Visible", False)
+	
+F.Intrinsic.Control.Else
+	
+	Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "WORK_ORDER", "Visible", False)
+	Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "WO_SUFF", "Visible", False)
+	Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "WO_SEQUENCE", "Visible", False)
+	
+F.Intrinsic.Control.EndIf
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "LINE_SEQUENCE", "Visible", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSTRUCTIONS", "Visible", False)
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "CellWordWrap", "Wrap")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "CellWordWrap", "Wrap")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "CellWordWrap", "Wrap")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "CellWordWrap", "Wrap")
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "Caption", "Inspection")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "Caption", "Method")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "Caption", "Frequency")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "Caption", "Non Conform")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "Caption", " ")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "Caption", " ")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "Caption", " ")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "Caption", " ")
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "ReadOnly", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "ReadOnly", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "ReadOnly", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "ReadOnly", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "ReadOnly", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "ReadOnly", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "ReadOnly", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "ReadOnly", True)
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "AllowEdit", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "AllowEdit", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "AllowEdit", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "AllowEdit", True)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "AllowEdit", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "AllowEdit", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "AllowEdit", False)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "AllowEdit", False)
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "MinWidth", 250)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "MinWidth", 250)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "MinWidth", 250)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "MinWidth", 250)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "MinWidth", 10)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "MinWidth", 10)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "MinWidth", 10)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "MinWidth", 10)
+
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "Width", 100)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "Width", 100)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "Width", 100)
+'Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "Width", 100)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "Width", 10)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "Width", 10)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "Width", 10)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "Width", 10)
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION", "VisibleIndex", 1)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "VisibleIndex", 2)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD", "VisibleIndex", 3)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "VisibleIndex", 4)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY", "VisibleIndex", 5)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "VisibleIndex", 6)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM", "VisibleIndex", 7)
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "VisibleIndex", 8)
+
+Gui.F_Grid.GsGcSeqs.ColumnEdit("gridInspInfo", "INSPECTION_BRW", "EditorButton", "")
+Gui.F_Grid.GsGcSeqs.ColumnEdit("gridInspInfo", "METHOD_BRW", "EditorButton", "")
+Gui.F_Grid.GsGcSeqs.ColumnEdit("gridInspInfo", "FREQUENCY_BRW", "EditorButton", "")
+Gui.F_Grid.GsGcSeqs.ColumnEdit("gridInspInfo", "NON_CONFORM_BRW", "EditorButton", "")
+
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "INSPECTION_BRW", "Icon", "BROWSE")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "METHOD_BRW", "Icon", "BROWSE")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "FREQUENCY_BRW", "Icon", "BROWSE")
+Gui.F_Grid.GsGcSeqs.SetColumnProperty("gridInspInfo", "NON_CONFORM_BRW", "Icon", "BROWSE")
+
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "multiselect", False)
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "AllowSort", False)
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "AllowFilter", False)
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "OptionsViewRowAutoHeight", True)
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "OptionsViewColumnAutoWidth", False)
+Gui.F_Grid.GsGcSeqs.SetGridviewProperty("gridInspInfo", "AllowColumnMoving", False)
+
+F.Intrinsic.Control.CallSub(LoadDDLs)
+
+Gui.F_Grid.GsGcSeqs.MainView("gridInspInfo")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.GridProperties.End
+
+Program.Sub.RowManagement.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sRoutr.Declare(String, "")
+V.Local.sRtLin.Declare(String, "")
+V.Local.sWO.Declare(String, "")
+V.Local.sWOSuff.Declare(String, "")
+V.Local.sWOLine.Declare(String, "")
+V.Local.sGridL.Declare(String, "")
+V.Local.sValue.Declare(String, "")
+V.Local.sFilter.Declare(String, "")
+V.Local.sSql.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+V.Local.iRowNo.Declare(Long, 0)
+V.Local.iCount.Declare(Long, 0)
+V.Local.iNwSeq.Declare(Long, 0)
+V.Local.iNextS.Declare(Long, 0)
+V.Local.iPermaNo.Declare(Long, 0)
+
+Gui.F_Grid.GsGcSeqs.Visible(False)
+Gui.F_Grid.GsGcSeqs.SuspendLayout
+'Fired from the contesxt menu attached to the grid
+F.Intrinsic.Control.SelectCase(V.Args.ITEMNAME.UCase)
+	
+	F.Intrinsic.Control.Case("ADD")
+'		Gui.F_Grid.GsGcSeqs.GetRowCount("gridInspInfo", V.Local.iRowNo)
+		F.Intrinsic.Control.If(V.DataView.dtInspInfo!dvInspGrid.RowCount, <>, 0)
+'			Gui.F_Grid.GsGcSeqs.GetCellValueByColumnName("gridInspInfo", "LINE_SEQUENCE", V.DataView.dtInspInfo!dvInspGrid.RowCount--, V.Local.iRowNo)
+			F.Intrinsic.Math.Add(V.DataView.dtInspInfo!dvInspGrid(V.DataView.dtInspInfo!dvInspGrid.RowCount--).LINE_SEQUENCE!FieldValLong, 1, V.Local.iRowNo)
+		
+		F.Intrinsic.Control.Else
+			V.Local.iRowNo.Set(1)
+			
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.Control.If(V.Global.sWO, =, "")
+			
+			V.Local.sRoutr.Set(V.Passed.008000)
+			F.Intrinsic.String.LPad(V.Passed.000111, "0", 6, V.Local.sRtLin)
+			F.Data.DataTable.AddRow("dtInspInfo", "ROUTER", V.Local.sRoutr.Trim, "LINE_ROUTER", V.Local.sRtLin, "LINE_SEQUENCE", V.Local.iRowNo)
+			
+		F.Intrinsic.Control.Else
+			
+'			V.Local.sWO.Set(V.Passed.008000)
+'			V.Local.sWOSuff.Set(V.Passed.008001)
+'			F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			
+			F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+			V.Local.sTemp.RedimPreserve(0,1)
+			
+			V.Local.sWO.Set(V.Local.sTemp(0))
+			V.Local.sWOSuff.Set(V.Local.sTemp(1))
+			
+			F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+			F.Intrinsic.Control.Case(16773)
+				F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.Case(16768)
+				F.Intrinsic.String.LPad(V.Passed.000002, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.Case(47401)
+				F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.EndSelect
+			
+			F.Data.DataTable.AddRow("dtInspInfo", "WORK_ORDER", V.Local.sWO.Trim, "WO_SUFF", V.Local.sWOSuff, "WO_SEQUENCE", V.Local.sWOLine, "LINE_SEQUENCE", V.Local.iRowNo)
+			
+		F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.Case("REMOVE")
+		
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		F.Data.DataTable.SetValue("dtInspInfo", V.Local.sGridL.Long, "LINE_SEQUENCE", -1)
+		
+	F.Intrinsic.Control.Case("INSERT")
+		'We need add a new line in the middle of the grid. To achieve this, we need to move everything down first...
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		F.Intrinsic.Math.Add(V.Local.sGridL(V.Local.sGridL.UBound), 1, V.Local.iNextS)
+		F.Intrinsic.Control.For(V.Local.iCount, V.DataTable.dtInspInfo.RowCount--, V.Local.iNextS, -1)
+			Gui.F_Grid.GsGcSeqs.GetCellValueByColumnName("gridInspInfo", "LINE_SEQUENCE", V.Local.iCount, V.Local.iRowNo)
+			F.Intrinsic.Math.Add(V.Local.iRowNo, 1, V.Local.iRowNo)
+			Gui.F_Grid.GsGcSeqs.SetCellValueByColumnName("gridInspInfo", "LINE_SEQUENCE", V.Local.iCount, V.Local.iRowNo)
+			
+		F.Intrinsic.Control.Next(V.Local.iCount)
+		
+		F.Intrinsic.Math.Add(V.Local.iRowNo, -1, V.Local.iRowNo)
+		
+		F.Intrinsic.Control.If(V.Global.sWO, =, "")
+			
+			V.Local.sRoutr.Set(V.Passed.008000)
+			F.Intrinsic.String.LPad(V.Passed.000111, "0", 6, V.Local.sRtLin)
+			F.Data.DataTable.AddRow("dtInspInfo", "ROUTER", V.Local.sRoutr, "LINE_ROUTER", V.Local.sRtLin, "LINE_SEQUENCE", V.Local.iRowNo)
+			
+		F.Intrinsic.Control.Else
+			
+'			V.Local.sWO.Set(V.Passed.008000)
+'			V.Local.sWOSuff.Set(V.Passed.008001)
+'			F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			
+			F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+			V.Local.sTemp.RedimPreserve(0,1)
+			
+			V.Local.sWO.Set(V.Local.sTemp(0))
+			V.Local.sWOSuff.Set(V.Local.sTemp(1))
+			
+			F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+			F.Intrinsic.Control.Case(16773)
+				F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.Case(16768)
+				F.Intrinsic.String.LPad(V.Passed.000002, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.Case(47401)
+				F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+			F.Intrinsic.Control.EndSelect
+			
+			F.Data.DataTable.AddRow("dtInspInfo", "WORK_ORDER", V.Local.sWO.Trim, "WO_SUFF", V.Local.sWOSuff, "WO_SEQUENCE", V.Local.sWOLine, "LINE_SEQUENCE", V.Local.iRowNo)
+			
+		F.Intrinsic.Control.EndIf
+		
+	F.Intrinsic.Control.Case("UP")
+		'We are goign to grab the rows selected and move them up one
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		F.Intrinsic.Control.For(V.Local.iCount, 0, V.Local.sGridL.UBound, 1)
+			F.Intrinsic.Control.If(V.Local.sGridL(V.Local.iCount), <>, 1)
+				'Apparently these idexes are the index for the actual table, so regardless of the view, 
+				V.Local.iPermaNo.Set(V.Local.sGridL(V.Local.iCount))
+				V.Local.iNwSeq.Set(V.DataTable.dtInspInfo.LINE_SEQUENCE(V.Local.iPermaNo)!FieldValLong)
+				F.Intrinsic.Math.Add(V.Local.iNwSeq, -1, V.Local.iNextS)
+				
+				'We create the dataview to change the value of the sequence
+				F.Intrinsic.String.Build("[LINE_SEQUENCE] = '{0}'", V.Local.iNextS, V.Local.sFilter)
+				
+				F.Data.DataView.Create("dtInspInfo", "dvMoveDown", 22, V.Local.sFilter, "")
+				
+				F.Intrinsic.Control.If(V.DataView.dtInspInfo!dvMoveDown.RowCount, >, 0)
+					
+					'This will in turn make the dataview blank, but it does not matter, we have done the check already
+					F.Data.DataView.SetValue("dtInspInfo", "dvMoveDown", 0, "LINE_SEQUENCE", V.Local.iNwSeq)
+					
+					'And now we return to our selected row and make it the value we used for the filter
+					F.Data.DataTable.SetValue("dtInspInfo", V.Local.iPermaNo, "LINE_SEQUENCE", V.Local.iNextS)
+					
+				F.Intrinsic.Control.EndIf
+				
+				F.Data.DataView.Close("dtInspInfo", "dvMoveDown")
+			
+			F.Intrinsic.Control.Else
+				
+				F.Intrinsic.Control.ExitSub
+				
+			F.Intrinsic.Control.EndIf
+			
+		F.Intrinsic.Control.Next(V.Local.iCount)
+		
+	F.Intrinsic.Control.Case("DOWN")
+		'We are goign to grab the rows selected and move them down one
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		
+		F.Intrinsic.Control.For(V.Local.iCount, V.Local.sGridL.UBound, 0, -1)
+			F.Intrinsic.Control.If(V.Local.sGridL, <>, V.DataView.dtInspInfo!dvInspGrid.RowCount)
+				
+				'Apparently these idexes are the index for the actual table, so regardless of the view, this will never change
+				V.Local.iPermaNo.Set(V.Local.sGridL(V.Local.iCount))
+				V.Local.iNwSeq.Set(V.DataTable.dtInspInfo.LINE_SEQUENCE(V.Local.iPermaNo)!FieldValLong)
+				F.Intrinsic.Math.Add(V.Local.iNwSeq, 1, V.Local.iNextS)
+				
+				'We create the dataview to change the value of the sequence
+				F.Intrinsic.String.Build("[LINE_SEQUENCE] = '{0}'", V.Local.iNextS, V.Local.sFilter)
+				
+				F.Data.DataView.Create("dtInspInfo", "dvMoveDown", 22, V.Local.sFilter, "")
+				
+				F.Intrinsic.Control.If(V.DataView.dtInspInfo!dvMoveDown.RowCount, >, 0)
+					
+					'This will in turn make the dataview blank, but it does not matter, we have done the check already
+					F.Data.DataView.SetValue("dtInspInfo", "dvMoveDown", 0, "LINE_SEQUENCE", V.Local.iNwSeq)
+					
+					'And now we return to our selected row and make it the value we used for the filter
+					F.Data.DataTable.SetValue("dtInspInfo", V.Local.iPermaNo, "LINE_SEQUENCE", V.Local.iNextS)
+					
+				F.Intrinsic.Control.EndIf
+				
+				F.Data.DataView.Close("dtInspInfo", "dvMoveDown")
+				
+			F.Intrinsic.Control.Else
+				
+				F.Intrinsic.Control.ExitSub
+				
+			F.Intrinsic.Control.EndIf
+			
+		F.Intrinsic.Control.Next(V.Local.iCount)
+		
+	F.Intrinsic.Control.Case("COPY")
+		
+		F.Intrinsic.String.Build("Delete from GCG_5841_COPY_RT_INS where USER_NO = '{0}' and TERMINAL_NO = '{1}'", V.Caller.User, V.Caller.Terminal, V.Local.sSql)
+		
+		F.ODBC.Connection!conx.OpenCompanyConnection
+		
+		F.ODBC.Connection!conx.Execute(V.Local.sSql)
+		
+		F.Data.DataTable.CreateFromSQL("dtCopy", "conx", "Select USER_NO, TERMINAL_NO, LINE_SEQUENCE, INSPECTION, METHOD, FREQUENCY, NON_CONFORM from GCG_5841_COPY_RT_INS", True)
+		
+		'dt should be blank
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		F.Intrinsic.Control.For(V.Local.iCount, 0, V.Local.sGridL.UBound, 1)
+			V.Local.iPermaNo.Set(V.Local.sGridL(V.Local.iCount).Long)
+			F.Data.DataTable.AddRow("dtCopy", "USER_NO", V.Caller.User, "TERMINAL_NO", V.Caller.Terminal, "LINE_SEQUENCE", V.DataTable.dtInspInfo.LINE_SEQUENCE(V.Local.iPermaNo)!FieldValLong, "INSPECTION", V.DataTable.dtInspInfo.INSPECTION(V.Local.iPermaNo)!FieldValTrim, "METHOD", V.DataTable.dtInspInfo.METHOD(V.Local.iPermaNo)!FieldValTrim, "FREQUENCY", V.DataTable.dtInspInfo.FREQUENCY(V.Local.iPermaNo)!FieldValTrim, "NON_CONFORM", V.DataTable.dtInspInfo.NON_CONFORM(V.Local.iPermaNo)!FieldValTrim)
+			
+			
+		F.Intrinsic.Control.Next(V.Local.iCount)
+		
+		F.Data.DataView.Create("dtCopy", "dvRenum", 22, "", "LINE_SEQUENCE ASC")
+		
+		F.Data.DataView.SetSeries("dtCopy", "dvRenum", "LINE_SEQUENCE", 1, 1)
+		
+'		F.Data.DataTable.SaveToDB("dtCopy", "conx", "GCG_5841_COPY_RT_INS")
+		F.Data.DataTable.SaveToDB("dtCopy", "conx", "GCG_5841_COPY_RT_INS", "", 128)
+		F.ODBC.Connection!conx.Close
+		
+		F.Data.DataView.Close("dtCopy", "dvRenum")
+		F.Data.DataTable.Close("dtCopy")
+		
+	F.Intrinsic.Control.Case("PASTE")
+		
+		Gui.F_Grid.GsGcSeqs.GetSelectedRows("gridInspInfo", V.Local.sGridL)
+		F.Intrinsic.String.Split(V.Local.sGridL, "*!*", V.Local.sGridL)
+		'In case they selected multiple rows for some reason
+		F.Intrinsic.Variable.ArrayMin(V.Local.sGridL, V.Local.iRowNo)
+		V.Local.iNwSeq.Set(V.DataTable.dtInspInfo(V.Local.iRowNo).LINE_SEQUENCE!FieldValLong)
+		
+		'Now we grab the information saved into the database and use it to add it to the 
+		F.ODBC.Connection!conx.OpenCompanyConnection
+		
+		F.Intrinsic.String.Build("Select USER_NO, TERMINAL_NO, LINE_SEQUENCE, INSPECTION, METHOD, FREQUENCY, NON_CONFORM from GCG_5841_COPY_RT_INS where USER_NO = '{0}' and TERMINAL_NO = '{1}'", V.Caller.User, V.Caller.Terminal, V.Local.sSql)
+		
+		F.Data.DataTable.CreateFromSQL("dtPaste", "conx", V.Local.sSql, True)
+		
+		F.Intrinsic.Control.If(V.DataTable.dtPaste.RowCount, >, 0)
+			'The number of rows we are adding
+			V.Local.iPermaNo.Set(V.DataTable.dtPaste.RowCount)
+			
+			'What we are going to have to do is add the number of rows to the value of Line_Seq for everything that has the value of >= that line seq..
+			F.Intrinsic.String.Build("[LINE_SEQUENCE] >= '{0}'", V.Local.iNwSeq, V.Local.sFilter)
+			F.Data.DataView.Create("dtInspInfo", "dvBumped", 22, V.Local.sFilter, "LINE_SEQUENCE DESC")
+			F.Intrinsic.Control.For(V.Local.iCount, 0, V.DataView.dtInspInfo!dvBumped.RowCount--, 1)
+				F.Intrinsic.Math.Add(V.DataView.dtInspInfo!dvBumped(V.Local.iCount).LINE_SEQUENCE!FieldValLong, V.Local.iPermaNo, V.Local.iNextS)
+				F.Data.DataView.SetValue("dtInspInfo", "dvBumped", V.Local.iCount, "LINE_SEQUENCE", V.Local.iNextS)
+			F.Intrinsic.Control.Next(V.Local.iCount)
+			
+			F.Data.DataView.Close("dtInspInfo", "dvBumped")
+			
+			'Now we can instert the values..
+			F.Intrinsic.Control.If(V.Global.sWO, =, "")
+			
+				V.Local.sRoutr.Set(V.Passed.008000)
+				F.Intrinsic.String.LPad(V.Passed.000111, "0", 6, V.Local.sRtLin)
+				
+				F.Intrinsic.Control.For(V.Local.iCount, 0, V.DataTable.dtPaste.RowCount--, 1)
+					
+					F.Data.DataTable.AddRow("dtInspInfo", "ROUTER", V.Local.sRoutr, "LINE_ROUTER", V.Local.sRtLin, "LINE_SEQUENCE", V.Local.iNwSeq, "INSPECTION", V.DataTable.dtPaste(V.Local.iCount).INSPECTION!FieldValTrim, "METHOD", V.DataTable.dtPaste(V.Local.iCount).METHOD!FieldValTrim, "FREQUENCY", V.DataTable.dtPaste(V.Local.iCount).FREQUENCY!FieldValTrim, "NON_CONFORM", V.DataTable.dtPaste(V.Local.iCount).NON_CONFORM!FieldValTrim)
+					
+					F.Intrinsic.Math.Add(V.Local.iNwSeq, 1, V.Local.iNwSeq)
+				F.Intrinsic.Control.Next(V.Local.iCount)
+				
+			F.Intrinsic.Control.Else
+				
+				F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+				V.Local.sTemp.RedimPreserve(0,1)
+				
+				V.Local.sWO.Set(V.Local.sTemp(0))
+				V.Local.sWOSuff.Set(V.Local.sTemp(1))
+				
+				F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+				F.Intrinsic.Control.Case(16773)
+					F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+				F.Intrinsic.Control.Case(16768)
+					F.Intrinsic.String.LPad(V.Passed.000002, "0", 6, V.Local.sWOLine)
+				F.Intrinsic.Control.Case(47401)
+					F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+				F.Intrinsic.Control.EndSelect
+				
+				F.Intrinsic.Control.For(V.Local.iCount, 0, V.DataTable.dtPaste.RowCount--, 1)
+					
+					F.Data.DataTable.AddRow("dtInspInfo", "WORK_ORDER", V.Local.sWO, "WO_SUFF", V.Local.sWOSuff, "WO_SEQUENCE", V.Local.sWOLine, "LINE_SEQUENCE", V.Local.iNwSeq, "INSPECTION", V.DataTable.dtPaste(V.Local.iCount).INSPECTION!FieldValTrim, "METHOD", V.DataTable.dtPaste(V.Local.iCount).METHOD!FieldValTrim, "FREQUENCY", V.DataTable.dtPaste(V.Local.iCount).FREQUENCY!FieldValTrim, "NON_CONFORM", V.DataTable.dtPaste(V.Local.iCount).NON_CONFORM!FieldValTrim)
+					
+					F.Intrinsic.Math.Add(V.Local.iNwSeq, 1, V.Local.iNwSeq)
+				F.Intrinsic.Control.Next(V.Local.iCount)
+				
+			F.Intrinsic.Control.EndIf
+
+			
+		F.Intrinsic.Control.Else
+			
+			F.Intrinsic.UI.Msgbox("No saved data was found for the current user")
+			
+		F.Intrinsic.Control.EndIf
+		
+		F.Data.DataTable.Close("dtPaste")
+		
+		F.ODBC.Connection!conx.Close
+		
+F.Intrinsic.Control.EndSelect
+Gui.F_Grid.GsGcSeqs.ResumeLayout
+Gui.F_Grid.GsGcSeqs.Visible(True)
+
+F.Intrinsic.Control.Catch
+	Gui.F_Grid.GsGcSeqs.Visible(True)
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.RowManagement.End
+
+Program.Sub.SaveInspectionInformation.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sRoutr.Declare(String, "")
+V.Local.sRtLin.Declare(String, "")
+V.Local.sWO.Declare(String, "")
+V.Local.sWOSuff.Declare(String, "")
+V.Local.sWOLine.Declare(String, "")
+V.Local.sQuery.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+
+'Save information
+Gui.F_Grid..Enabled(False)
+'We are grabbing the information in the instructions textbox and adding it to the first row of the table
+F.Data.DataTable.SetValue("dtInspInfo", 0, "INSTRUCTIONS", V.Screen.F_Grid!txtInst.Text)
+
+'The 'deleted' rows have a value of -1 on the LINE_SEQUENCE column, so we create a new table omiting those values
+
+F.Data.DataView.Create("dtInspInfo", "dvToSave", 22, "[LINE_SEQUENCE] <> -1", "LINE_SEQUENCE ASC")
+F.Data.DataView.ToDataTable("dtInspInfo", "dvToSave", "dtToSave")
+
+'Need to delete the broswer stuff
+F.Data.DataTable.RemoveColumn("dtToSave", "INSPECTION_BRW")
+F.Data.DataTable.RemoveColumn("dtToSave", "METHOD_BRW")
+F.Data.DataTable.RemoveColumn("dtToSave", "FREQUENCY_BRW")
+F.Data.DataTable.RemoveColumn("dtToSave", "NON_CONFORM_BRW")
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+F.Intrinsic.Control.If(V.Global.sWO, =, "")
+
+	V.Local.sRoutr.Set(V.Passed.008000)
+	F.Intrinsic.String.LPad(V.Passed.000111, "0", 6, V.Local.sRtLin)
+	
+	F.Intrinsic.String.Build("Delete from GCG_5841_RT_INSP where ROUTER = '{0}' and LINE_ROUTER = '{1}'", V.Local.sRoutr.Trim, V.Local.sRtLin, V.Local.sQuery)
+	F.ODBC.Connection!conx.Execute(V.Local.sQuery)
+	
+	F.Data.DataTable.SaveToDB("dtToSave", "conx", "GCG_5841_RT_INSP", "", 128)
+	
+F.Intrinsic.Control.Else
+	
+	F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+	V.Local.sTemp.RedimPreserve(0,1)
+	
+	V.Local.sWO.Set(V.Local.sTemp(0))
+	V.Local.sWOSuff.Set(V.Local.sTemp(1))
+	
+	F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+	F.Intrinsic.Control.Case(16773)
+		F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+	F.Intrinsic.Control.Case(16768)
+		F.Intrinsic.String.LPad(V.Passed.000002, "0", 6, V.Local.sWOLine)
+	F.Intrinsic.Control.Case(47401)
+		F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+	F.Intrinsic.Control.EndSelect
+	
+	F.Intrinsic.String.Build("Delete from GCG_5841_WO_INSP where WORK_ORDER = '{0}' and WO_SUFF = '{1}' and WO_SEQUENCE = '{2}'", V.Local.sWO, V.Local.sWOSuff, V.Local.sWOLine, V.Local.sQuery)
+	F.ODBC.Connection!conx.Execute(V.Local.sQuery)
+	
+	F.Data.DataTable.SaveToDB("dtToSave", "conx", "GCG_5841_WO_INSP", "", 128)
+	
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conx.Close
+F.Data.DataTable.Close("dtToSave")
+F.Data.DataView.Close("dtInspInfo", "dvToSave")
+
+Gui.F_Grid..Enabled(True)
+
+F.Intrinsic.Control.Catch
+	Gui.F_Grid..Enabled(True)
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.SaveInspectionInformation.End
+
+Program.Sub.SequenceRenumbering.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sQuery.Declare(String, "")
+V.Local.sRoutr.Declare(String, "")
+
+'If the user renumbers the sequence, we just go and change the sequence number on existing data.
+'Old sequence number is passed in V.Passed.ORIG-SEQ
+'New sequence number is passed in V.Passed.RENUM-SEQ
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+F.Intrinsic.String.Build("UPDATE GCG_5841_RT_INSP set LINE_ROUTER = '{0}' where ROUTER = '{1}' and LINE_ROUTER = '{2}'", V.Passed.RENUM-SEQ, V.Passed.ROUTER-NUM.Trim, V.Passed.ORIG-SEQ, V.Local.sQuery)
+F.ODBC.Connection!conx.Execute(V.Local.sQuery)
+
+F.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.SequenceRenumbering.End
+
+Program.Sub.LoadDDLs.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sValues.Declare(String, "")
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+'We are going to be loading the information from the drop down lists
+F.Data.DataTable.CreateFromSQL("dtDdls", "conx", "Select TYPE_SEQ, ENTRY_TYPE, ENTRY_VALUE from GCG_5841_DDL_VALUES", True)
+
+''The creation of drop down lists in grids require that we pass a string delimited by *!*
+'F.Data.DataView.Create("dtDdls", "dvIddl", 22, "[ENTRY_TYPE] = 'I'", "TYPE_SEQ ASC")
+'F.Data.DataView.ToString("dtDdls", "dvIddl", "ENTRY_VALUE", "", "*!*", V.Local.sValues)
+'F.Intrinsic.String.Build("*!*{0}", V.Local.sValues, V.Local.sValues)
+
+''Gui.F_Grid.GsGcSeqs.ColumnEdit("gridInspInfo", "INSPECTION", "DropDownList", V.Local.sValues)
+
+'F.Data.DataView.Close("dtDdls", "dvIddl")
+
+
+F.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadDDLs.End
+
+Program.Sub.BrowserButtons.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sContents.Declare(String, "")
+V.Local.sReturn.Declare(String, "")
+
+'I may have to just create another form..
+
+Gui.F_Grid.GsGcSeqs.SuspendLayout
+
+'Depending on the browser that the user clicks on, we want to display a browser for the appropriate column
+F.Intrinsic.Control.SelectCase(V.Args.Column)
+F.Intrinsic.Control.Case("INSPECTION_BRW")
+	F.Data.DataView.Create("dtDdls", "dvIddl", 22, "[ENTRY_TYPE] = 'I'", "TYPE_SEQ ASC")
+	F.Data.DataView.ToString("dtDdls", "dvIddl", "ENTRY_VALUE", "", "*!*", V.Local.sContents)
+	
+	F.Intrinsic.UI.BrowserFromString("Inspection Browser", V.Local.sContents, "@!@", "*!*", "Inspection", "50", V.Local.sReturn)
+	F.Intrinsic.Control.If(V.Local.sReturn, <>, "***CANCEL***")
+		'We place the value on the selected row/column
+		F.Data.DataTable.SetValue("dtInspInfo", V.Args.RowIndex, "INSPECTION", V.Local.sReturn)
+		
+	F.Intrinsic.Control.EndIf
+	F.Data.DataView.Close("dtDdls", "dvIddl")
+	
+'	F.ODBC.Connection!conx.OpenCompanyConnection
+	
+	'F.Intrinsic.UI.Browser("INSPECTION", "conx", "Select ENTRY_VALUE from GCG_5841_DDL_VALUES where ENTRY_TYPE = 'I' order by TYPE_SEQ ASC", "INSPECTION", "250", V.Local.sReturn)
+	
+F.Intrinsic.Control.Case("METHOD_BRW")
+	F.Data.DataView.Create("dtDdls", "dvIddM", 22, "[ENTRY_TYPE] = 'M'", "TYPE_SEQ ASC")
+	F.Data.DataView.ToString("dtDdls", "dvIddM", "ENTRY_VALUE", "", "*!*", V.Local.sContents)
+	
+	F.Intrinsic.UI.BrowserFromString("Method Browser", V.Local.sContents, "@!@", "*!*", "Method", "50", V.Local.sReturn)
+	F.Intrinsic.Control.If(V.Local.sReturn, <>, "***CANCEL***")
+		'We place the value on the selected row/column
+		F.Data.DataTable.SetValue("dtInspInfo", V.Args.RowIndex, "METHOD", V.Local.sReturn)
+		
+	F.Intrinsic.Control.EndIf
+	F.Data.DataView.Close("dtDdls", "dvIddM")
+	
+F.Intrinsic.Control.Case("FREQUENCY_BRW")
+	F.Data.DataView.Create("dtDdls", "dvIddF", 22, "[ENTRY_TYPE] = 'F'", "TYPE_SEQ ASC")
+	F.Data.DataView.ToString("dtDdls", "dvIddF", "ENTRY_VALUE", "", "*!*", V.Local.sContents)
+	
+	F.Intrinsic.UI.BrowserFromString("Frequency Browser", V.Local.sContents, "@!@", "*!*", "Frequency", "50", V.Local.sReturn)
+	F.Intrinsic.Control.If(V.Local.sReturn, <>, "***CANCEL***")
+		'We place the value on the selected row/column
+		F.Data.DataTable.SetValue("dtInspInfo", V.Args.RowIndex, "FREQUENCY", V.Local.sReturn)
+		
+	F.Intrinsic.Control.EndIf
+	F.Data.DataView.Close("dtDdls", "dvIddF")
+	
+F.Intrinsic.Control.Case("NON_CONFORM_BRW")
+	F.Data.DataView.Create("dtDdls", "dvIddN", 22, "[ENTRY_TYPE] = 'N'", "TYPE_SEQ ASC")
+	F.Data.DataView.ToString("dtDdls", "dvIddN", "ENTRY_VALUE", "", "*!*", V.Local.sContents)
+	
+	F.Intrinsic.UI.BrowserFromString("Inspection Browser", V.Local.sContents, "@!@", "*!*", "Non Conform", "50", V.Local.sReturn)
+	F.Intrinsic.Control.If(V.Local.sReturn, <>, "***CANCEL***")
+		'We place the value on the selected row/column
+		F.Data.DataTable.SetValue("dtInspInfo", V.Args.RowIndex, "NON_CONFORM", V.Local.sReturn)
+		
+	F.Intrinsic.Control.EndIf
+	F.Data.DataView.Close("dtDdls", "dvIddN")
+
+F.Intrinsic.Control.EndSelect
+
+Gui.F_Grid.GsGcSeqs.ResumeLayout
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+'	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.BrowserButtons.End
+
+Program.Sub.WOCheck.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sSql.Declare(String, "")
+V.Local.sRouter.Declare(String, "")
+V.Local.sReturn.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+V.Local.sWO.Declare(String, "")
+V.Local.sWOSuff.Declare(String, "")
+
+'If the WO Inspection table does not have an entry for the work order, we are going to check for the router information and save it into the WO table
+'Router number does not get passed, so we need to go searchin for it
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+'We have the work order and suffix saved in the GLOBAL passed variable
+F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+V.Local.sTemp.RedimPreserve(0,1)
+
+F.Intrinsic.String.Build("Select * from GCG_5841_WO_INSP where WORK_ORDER = '{0}' and WO_SUFF = '{1}'", V.Local.sTemp(0), V.Local.sTemp(1), V.Local.sSql)
+F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSql, V.Local.sReturn)
+
+F.Intrinsic.Control.If(V.Local.sReturn, =, "")
+	
+	F.Intrinsic.String.Build("Select TOP 1 ROUTER from V_JOB_HEADER where JOB = '{0}' and SUFFIX = '{1}'", V.Local.sTemp(0), V.Local.sTemp(1), V.Local.sSql)
+	F.ODBC.Connection!conx.ExecuteAndReturn(V.Local.sSql, V.Local.sRouter)
+	
+	F.Intrinsic.Control.If(V.Local.sRouter, <>, "")
+		F.Intrinsic.String.Build("Select LEFT('0' + LINE_ROUTER, 6) as WO_SEQUENCE, LINE_SEQUENCE, INSTRUCTIONS, INSPECTION, METHOD, FREQUENCY, NON_CONFORM from GCG_5841_RT_INSP where ROUTER = '{0}'", V.Local.sRouter, V.Local.sSql)
+		F.Data.DataTable.CreateFromSQl("dtToWO", "conx", V.Local.sSql, True)
+		F.Intrinsic.Control.If(V.DataTable.dtToWO.RowCount--, >, 0)
+			F.Data.DataTable.AddColumn("dtToWO", "WORK_ORDER", "String", V.Local.sTemp(0))
+			F.Data.DataTable.AddColumn("dtToWO", "WO_SUFF", "String", V.Local.sTemp(1))
+			
+'			F.Data.DataTable.AddExpressionColumn("dtToWO", "WO_SEQUENCE", "String", "SUBSTRING('0' + [LINE_ROUTER], 0,6)")
+			
+			F.Data.DataView.Create("dtToWO", "dvCleanse", 22)
+			
+			F.Data.DataView.ToDataTable("dtToWO", "dvCleanse", "dtWOInfo")
+			
+'			F.Data.DataTable.RemoveColumn("dtWOInfo", "LINE_ROUTER")
+			
+			'We save it to teh GCG_5841_WO_INSP
+			F.Data.DataTable.SaveToDB("dtWOInfo", "conx", "GCG_5841_WO_INSP", "", 128)
+			
+			F.Data.DataTable.Close("dtWOInfo")
+			F.Data.DataView.Close("dtToWO", "dvCleanse")
+			
+		F.Intrinsic.Control.EndIf
+		F.Data.DataTable.Close("dtToWO")
+		
+	F.Intrinsic.Control.Else
+		'Error about not finding the router...
+		
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conx.Close
+
+V.Global.sWO.Set("Y")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.WOCheck.End
+
+Program.Sub.WOInitialization.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sTemp.Declare(String, "")
+V.Local.sWO.Declare(String, "")
+V.Local.sWOSuff.Declare(String, "")
+V.Local.sWOLine.Declare(String, "")
+V.Local.sQuery.Declare(String, "")
+
+'We populate the screen with existing information from the database
+
+'V.Local.sWO.Set(V.Passed.008000)
+'V.Local.sWOSuff.Set(V.Passed.008001)
+
+F.Intrinsic.String.Split(V.Passed.GLOBAL, "-", V.Local.sTemp)
+V.Local.sTemp.RedimPreserve(0,1)
+
+V.Local.sWO.Set(V.Local.sTemp(0))
+V.Local.sWOSuff.Set(V.Local.sTemp(1))
+
+'We need to check the hook for the sequence :feelsbadman:
+F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+F.Intrinsic.Control.Case(16773)
+	F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+F.Intrinsic.Control.Case(16768)
+	F.Intrinsic.String.LPad(V.Passed.000002, "0", 6, V.Local.sWOLine)
+F.Intrinsic.Control.Case(47401)
+	F.Intrinsic.String.LPad(V.Passed.000001, "0", 6, V.Local.sWOLine)
+F.Intrinsic.Control.EndSelect
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+F.Intrinsic.String.Build("Select WORK_ORDER, WO_SUFF, WO_SEQUENCE, LINE_SEQUENCE, INSTRUCTIONS, INSPECTION, METHOD, FREQUENCY, NON_CONFORM from GCG_5841_WO_INSP where WORK_ORDER = '{0}' and WO_SUFF = '{1}' and WO_SEQUENCE = '{2}' order by LINE_SEQUENCE ASC", V.Local.sWO, V.Local.sWOSuff, V.Local.sWOLine, V.Local.sQuery)
+F.Data.DataTable.CreateFromSQL("dtInspInfo", "conx", V.Local.sQuery, True)
+
+F.ODBC.Connection!conx.Close
+
+'We want to make sure that the INSTRUCTIONS are only saved on the Line_sequence 0, and the actual grid information starts from value 1.
+F.Intrinsic.Control.If(V.DataTable.dtInspInfo.RowCount, =, 0)
+	F.Data.DataTable.AddRow("dtInspInfo", "WORK_ORDER", V.Local.sWO, "WO_SUFF", V.Local.sWOSuff, "WO_SEQUENCE", V.Local.sWOLine, "LINE_SEQUENCE", 0)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Work Order: {0}-{1}", V.Local.sWO, V.Local.sWOSuff,  V.Local.sWO)
+Gui.F_Grid.lblRT.Text(V.Local.sWO)
+
+F.Intrinsic.String.Build("Sequence: {0}", V.Local.sWOLine, V.Local.sWOLine)
+Gui.F_Grid.lblSeq.Text(V.Local.sWOLine)
+
+Gui.F_Grid.txtInst.Text(V.DataTable.dtInspInfo(0).INSTRUCTIONS!FieldVal)
+
+F.Intrinsic.Control.CallSub(GridProperties)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+'	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.WOInitialization.End
