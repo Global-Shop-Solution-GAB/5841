@@ -1,0 +1,333 @@
+Program.Sub.ScreenSU.Start
+Gui.FormAIAG..Create
+Gui.FormAIAG..Caption("AIAG Drop Down List Maintenance")
+Gui.FormAIAG..Size(11685,9225)
+Gui.FormAIAG..MinX(0)
+Gui.FormAIAG..MinY(0)
+Gui.FormAIAG..Position(0,0)
+Gui.FormAIAG..BackColor(-2147483633)
+Gui.FormAIAG..MousePointer(0)
+Gui.FormAIAG..ContextMenuCreate("ctxInsp")
+Gui.FormAIAG..ContextMenuAddItem("ctxInsp","ADD",0,"Add new")
+Gui.FormAIAG..ContextMenuAddItem("ctxInsp","REMOVE",0,"Remove selected")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxInsp","ADD","ClickAdd")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxInsp","REMOVE","ClickRemove")
+Gui.FormAIAG..ContextMenuCreate("ctxMeth")
+Gui.FormAIAG..ContextMenuAddItem("ctxMeth","ADD",0,"Add new")
+Gui.FormAIAG..ContextMenuAddItem("ctxMeth","REMOVE",0,"Remove selected")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxMeth","ADD","ClickAdd")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxMeth","REMOVE","ClickRemove")
+Gui.FormAIAG..ContextMenuCreate("ctxFreq")
+Gui.FormAIAG..ContextMenuAddItem("ctxFreq","ADD",0,"Add new")
+Gui.FormAIAG..ContextMenuAddItem("ctxFreq","REMOVE",0,"Remove selected")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxFreq","ADD","ClickAdd")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxFreq","REMOVE","ClickRemove")
+Gui.FormAIAG..ContextMenuCreate("ctxNon")
+Gui.FormAIAG..ContextMenuAddItem("ctxNon","ADD",0,"Add new")
+Gui.FormAIAG..ContextMenuAddItem("ctxNon","REMOVE",0,"Remove selected")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxNon","ADD","ClickAdd")
+Gui.FormAIAG..ContextMenuSetItemEventHandler("ctxNon","REMOVE","ClickRemove")
+Gui.FormAIAG..Event(UnLoad,Unload)
+Gui.FormAIAG.gsgcInsp.Create(GsGridControl)
+Gui.FormAIAG.gsgcInsp.Size(5280,3435)
+Gui.FormAIAG.gsgcInsp.Position(315,420)
+Gui.FormAIAG.gsgcInsp.ContextMenuAttach("ctxInsp")
+Gui.FormAIAG.gsgcMeth.Create(GsGridControl)
+Gui.FormAIAG.gsgcMeth.Size(5280,3435)
+Gui.FormAIAG.gsgcMeth.Position(6060,420)
+Gui.FormAIAG.gsgcMeth.ContextMenuAttach("ctxMeth")
+Gui.FormAIAG.gsgcFreq.Create(GsGridControl)
+Gui.FormAIAG.gsgcFreq.Size(5280,3435)
+Gui.FormAIAG.gsgcFreq.Position(315,4380)
+Gui.FormAIAG.gsgcFreq.ContextMenuAttach("ctxFreq")
+Gui.FormAIAG.gsgcNon.Create(GsGridControl)
+Gui.FormAIAG.gsgcNon.Size(5280,3435)
+Gui.FormAIAG.gsgcNon.Position(6060,4380)
+Gui.FormAIAG.gsgcNon.ContextMenuAttach("ctxNon")
+Gui.FormAIAG.cmdSave.Create(Button)
+Gui.FormAIAG.cmdSave.Size(855,375)
+Gui.FormAIAG.cmdSave.Position(10380,8160)
+Gui.FormAIAG.cmdSave.Caption("SAVE")
+Gui.FormAIAG.cmdSave.Event(Click,SaveInfo)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'FEQ 10/2020
+'Customer: Pacific Sintered Metals
+'Part of the AIGI project
+'This program was created for Pacific Sintered Metals. It is the drow down list maintenance fo the 'Inspection Control Plan' that they want to implement.
+'This script opens from a custom menu item. It saves  information per field that will be used as values of drop down lists for the Inspection Control Plan Instructions.
+'The grids each represent values to be used in the INSPECTION, METHOD, FREQUENCY, NON_CONFORM.
+
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+F.Intrinsic.Control.CallSub(Populate)
+
+Gui.FormAIAG..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Unload.End
+
+Program.Sub.Populate.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+'We will be grabbing all of the information in table GCG_5841_DDL_VALUES
+'The column "Entry_Type" will determine what kind of entry it is, and the column TYPE_SEQ determines the order in which it is to be shown
+
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+F.Data.DataTable.CreateFromSQL("dtEntire", "conx", "Select TYPE_SEQ, ENTRY_TYPE, ENTRY_VALUE from GCG_5841_DDL_VALUES", True)
+
+F.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.CallSub(GridProperties)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.Callsub(Unload)
+F.Intrinsic.Control.EndTry
+Program.Sub.Populate.End
+
+Program.Sub.GridProperties.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+'For each of the grids, we are just going to create a dataview of the table according to the flag that they pertain to
+
+'I is for Inspection
+F.Data.DataView.Create("dtEntire", "dvI", 22, "[ENTRY_TYPE] = 'I'", "TYPE_SEQ ASC")
+Gui.FormAIAG.gsgcInsp.AddGridviewFromDataview("gridI", "dtEntire", "dvI")
+Gui.FormAIAG.gsgcInsp.SetGridviewProperty("gridI", "AllowSort", False)
+Gui.FormAIAG.gsgcInsp.SetGridviewProperty("gridI", "AllowFilter", False)
+Gui.FormAIAG.gsgcInsp.SetGridviewProperty("gridI", "OptionsViewRowAutoHeight", True)
+
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "TYPE_SEQ", "Visible", False)
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "ENTRY_TYPE", "Visible", False)
+
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "ENTRY_VALUE", "Caption", "Inspection Values")
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "ENTRY_VALUE", "AllowEdit", True)
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "ENTRY_VALUE", "ReadOnly", False)
+Gui.FormAIAG.gsgcInsp.SetColumnProperty("gridI", "ENTRY_VALUE", "CellWordWrap", "Wrap")
+
+Gui.FormAIAG.gsgcInsp.MainView("gridI")
+
+'M is for Meth
+F.Data.DataView.Create("dtEntire", "dvM", 22, "[ENTRY_TYPE] = 'M'", "TYPE_SEQ ASC")
+Gui.FormAIAG.gsgcMeth.AddGridviewFromDataview("gridM", "dtEntire", "dvM")
+Gui.FormAIAG.gsgcMeth.SetGridviewProperty("gridM", "AllowSort", False)
+Gui.FormAIAG.gsgcMeth.SetGridviewProperty("gridM", "AllowFilter", False)
+Gui.FormAIAG.gsgcMeth.SetGridviewProperty("gridM", "OptionsViewRowAutoHeight", True)
+
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "TYPE_SEQ", "Visible", False)
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "ENTRY_TYPE", "Visible", False)
+
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "ENTRY_VALUE", "Caption", "Method Values")
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "ENTRY_VALUE", "AllowEdit", True)
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "ENTRY_VALUE", "ReadOnly", False)
+Gui.FormAIAG.gsgcMeth.SetColumnProperty("gridM", "ENTRY_VALUE", "CellWordWrap", "Wrap")
+
+Gui.FormAIAG.gsgcMeth.MainView("gridM")
+
+'F is for Freq
+F.Data.DataView.Create("dtEntire", "dvF", 22, "[ENTRY_TYPE] = 'F'", "TYPE_SEQ ASC")
+Gui.FormAIAG.gsgcFreq.AddGridviewFromDataview("gridF", "dtEntire", "dvF")
+Gui.FormAIAG.gsgcFreq.SetGridviewProperty("gridF", "AllowSort", False)
+Gui.FormAIAG.gsgcFreq.SetGridviewProperty("gridF", "AllowFilter", False)
+Gui.FormAIAG.gsgcFreq.SetGridviewProperty("gridF", "OptionsViewRowAutoHeight", True)
+
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "TYPE_SEQ", "Visible", False)
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "ENTRY_TYPE", "Visible", False)
+
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "ENTRY_VALUE", "Caption", "Frequency Values")
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "ENTRY_VALUE", "AllowEdit", True)
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "ENTRY_VALUE", "ReadOnly", False)
+Gui.FormAIAG.gsgcFreq.SetColumnProperty("gridF", "ENTRY_VALUE", "CellWordWrap", "Wrap")
+
+Gui.FormAIAG.gsgcFreq.MainView("gridF")
+
+'N is for Non
+F.Data.DataView.Create("dtEntire", "dvN", 22, "[ENTRY_TYPE] = 'N'", "TYPE_SEQ ASC")
+Gui.FormAIAG.gsgcNon.AddGridviewFromDataview("gridN", "dtEntire", "dvN")
+Gui.FormAIAG.gsgcNon.SetGridviewProperty("gridN", "AllowSort", False)
+Gui.FormAIAG.gsgcNon.SetGridviewProperty("gridN", "AllowFilter", False)
+Gui.FormAIAG.gsgcNon.SetGridviewProperty("gridN", "OptionsViewRowAutoHeight", True)
+
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "TYPE_SEQ", "Visible", False)
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "ENTRY_TYPE", "Visible", False)
+
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "ENTRY_VALUE", "Caption", "Non Conform Values")
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "ENTRY_VALUE", "AllowEdit", True)
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "ENTRY_VALUE", "ReadOnly", False)
+Gui.FormAIAG.gsgcNon.SetColumnProperty("gridN", "ENTRY_VALUE", "CellWordWrap", "Wrap")
+
+Gui.FormAIAG.gsgcNon.MainView("gridN")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.GridProperties.End
+
+Program.Sub.ClickAdd.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sType.Declare(String, "")
+V.Local.iNext.Declare(Long, 0)
+
+'This will get fired from all of the grids. We need to check the grid that is selected to determine the type of entry we will add to the table.
+F.Intrinsic.Control.SelectCase(V.Args.MenuName.UCase)
+
+F.Intrinsic.Control.Case("CTXINSP")
+	'The type for inspection is I
+	V.Local.iNext.Set(V.DataView.dtEntire!dvI.RowCount--)
+	F.Intrinsic.Control.If(V.Local.iNext, =,-1)
+		V.Local.iNext.Set(1)
+	F.Intrinsic.Control.Else	
+		F.Intrinsic.Math.Add(V.DataView.dtEntire!dvI(V.Local.iNext).TYPE_SEQ!FieldValTrim, 1, V.Local.iNext)
+	F.Intrinsic.Control.EndIf
+	V.Local.sType.Set("I")
+	
+F.Intrinsic.Control.Case("CTXMETH")
+	'The type for Method is M
+	V.Local.iNext.Set(V.DataView.dtEntire!dvM.RowCount--)
+	F.Intrinsic.Control.If(V.Local.iNext, =,-1)
+		V.Local.iNext.Set(1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Add(V.DataView.dtEntire!dvM(V.Local.iNext).TYPE_SEQ!FieldValTrim, 1, V.Local.iNext)
+	F.Intrinsic.Control.EndIf
+	V.Local.sType.Set("M")
+	
+F.Intrinsic.Control.Case("CTXFREQ")
+	'The type for Frequency is F
+	V.Local.iNext.Set(V.DataView.dtEntire!dvF.RowCount--)
+	F.Intrinsic.Control.If(V.Local.iNext, =,-1)
+		V.Local.iNext.Set(1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Add(V.DataView.dtEntire!dvF(V.Local.iNext).TYPE_SEQ!FieldValTrim, 1, V.Local.iNext)
+	F.Intrinsic.Control.EndIf
+	V.Local.sType.Set("F")
+	
+F.Intrinsic.Control.Case("CTXNON")
+	'The type for Non Conform is N
+	V.Local.iNext.Set(V.DataView.dtEntire!dvN.RowCount--)
+	F.Intrinsic.Control.If(V.Local.iNext, =,-1)
+		V.Local.iNext.Set(1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Add(V.DataView.dtEntire!dvN(V.Local.iNext).TYPE_SEQ!FieldValTrim, 1, V.Local.iNext)
+	F.Intrinsic.Control.EndIf
+	V.Local.sType.Set("N")
+	
+F.Intrinsic.Control.CaseElse
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.EndSelect
+
+F.Data.DataTable.AddRow("dtEntire","ENTRY_TYPE", V.Local.sType, "TYPE_SEQ", V.Local.iNext)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.ClickAdd.End
+
+Program.Sub.ClickRemove.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+V.Local.sRemove.Declare(String, "")
+V.Local.iCount.Declare(Long, 0)
+
+'Depending on what context menu is fired is the grid we have selected, so we get the row from tehre and delete it
+F.Intrinsic.Control.SelectCase(V.Args.MenuName.UCase)
+
+F.Intrinsic.Control.Case("CTXINSP")
+	Gui.FormAIAG.gsgcInsp.GetSelectedRows("gridI", V.Local.sRemove)
+	
+F.Intrinsic.Control.Case("CTXMETH")
+	Gui.FormAIAG.gsgcMeth.GetSelectedRows("gridM", V.Local.sRemove)
+	
+F.Intrinsic.Control.Case("CTXFREQ")
+	Gui.FormAIAG.gsgcFreq.GetSelectedRows("gridF", V.Local.sRemove)
+	
+F.Intrinsic.Control.Case("CTXNON")
+	Gui.FormAIAG.gsgcNon.GetSelectedRows("gridN", V.Local.sRemove)
+	
+F.Intrinsic.Control.CaseElse
+	F.Intrinsic.Control.ExitSub
+	
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.String.Split(V.Local.sRemove, "*!*", V.Local.sRemove)
+
+'Loop through and delete all available rows.. The indexes are those of the table
+F.Intrinsic.Control.For(V.Local.iCount, V.Local.sRemove.UBound, 0, -1)
+
+	F.Data.DataTable.DeleteRow("dtEntire", V.Local.sRemove(V.Local.iCount).Long)
+
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.ClickRemove.End
+
+Program.Sub.SaveInfo.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String, "")
+
+'Since we are expecting them to save funky characters, I dont want to 'delete' existing values before we save the new ones...
+F.ODBC.Connection!conx.OpenCompanyConnection
+
+'Now we save the values
+F.Data.DataTable.SaveToDB("dtEntire", "conx", "GCG_5841_DDL_VALUES", "TYPE_SEQ*!*ENTRY_TYPE", 7)
+
+Gui.FormAIAG..Visible(False)
+
+Gui.FormAIAG.gsgcInsp.SuspendLayout
+Gui.FormAIAG.gsgcMeth.SuspendLayout
+Gui.FormAIAG.gsgcFreq.SuspendLayout
+Gui.FormAIAG.gsgcNon.SuspendLayout
+
+F.Data.DataTable.Close("dtEntire")
+F.Data.DataTable.CreateFromSQL("dtEntire", "conx", "Select TYPE_SEQ, ENTRY_TYPE, ENTRY_VALUE from GCG_5841_DDL_VALUES", True)
+
+F.Intrinsic.Control.CallSub(GridProperties)
+
+Gui.FormAIAG.gsgcInsp.ResumeLayout
+Gui.FormAIAG.gsgcMeth.ResumeLayout
+Gui.FormAIAG.gsgcFreq.ResumeLayout
+Gui.FormAIAG.gsgcNon.ResumeLayout
+
+F.ODBC.Connection!conx.Close
+
+Gui.FormAIAG..Visible(True)
+
+F.Intrinsic.Control.Catch
+	Gui.FormAIAG..Visible(True)
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+F.Intrinsic.Control.EndTry
+Program.Sub.SaveInfo.End
